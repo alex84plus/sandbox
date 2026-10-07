@@ -1,6 +1,6 @@
 
 const canvas = document.getElementById("canvas");
-const context = canvas.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
@@ -11,8 +11,14 @@ const ropeLengthInput = document.getElementById("length");
 
 
 const damping = 0.99;
-const gravity = 1800;
+const gravity = 0.5;
 const segLength = 15;
+
+let points = [];
+
+let ropeActive = false;
+let placingRope = false;
+let holdingEndpoint = false;
 
 let pointer = {
     x: 0,
@@ -20,20 +26,20 @@ let pointer = {
 };
 
 class Point{
-    constructor(x,y, pinned){
+    constructor(x,y, pinned = false){
         this.x = x;
         this.y = y;
         this.oldX = x;
         this.oldY = y;
-        this.pinned = false;
+        this.pinned = pinned;
     }
 
     update(){
         // velocity using 2 points
-        if (this.pined) return;
+        if (this.pinned) return;
 
-        vx = (this.x - this.oldX) * damping;
-        vy = (this.y - this.oldY) * damping;
+        const vx = (this.x - this.oldX) * damping;
+        const vy = (this.y - this.oldY) * damping;
 
         this.oldX = this.x;
         this.oldY = this.y;
@@ -75,7 +81,16 @@ function createRope(startX, startY, totalLength){
 //
 
 function update() {
-    for (const point of points) {
+    for (let i = 0; i < points.length; i++) {
+        const point = points[i];
+
+        const isEndpoint =
+            i === points.length - 1;
+
+        if (holdingEndpoint && isEndpoint) {
+            continue;
+        }
+
         point.update();
     }
 
@@ -112,23 +127,30 @@ function solveConstraints() {
     }
 }
 
-canvas.addEventListener(
-    "pointermove",
-    event => {
-        updatePointer(event);
+canvas.addEventListener("pointerup", () => {
+    holdingEndpoint = false;
+});
 
-        if (holdingEndpoint) {
-            const end = points[points.length - 1];
+function updatePointer(event) {
+    const rect = canvas.getBoundingClientRect();
 
-            end.x = pointer.x;
-            end.y = pointer.y;
+    pointer.x = event.clientX - rect.left;
+    pointer.y = event.clientY - rect.top;
+}
 
-            end.oldX = pointer.x;
-            end.oldY = pointer.y;
-        }
+canvas.addEventListener("pointermove", event => {
+    updatePointer(event);
+
+    if (holdingEndpoint) {
+        const end = points[points.length - 1];
+
+        end.x = pointer.x;
+        end.y = pointer.y;
+
+        end.oldX = pointer.x;
+        end.oldY = pointer.y;
     }
-);
-
+});
 function draw() {
     ctx.clearRect(
         0,
@@ -140,22 +162,32 @@ function draw() {
     if (points.length === 0) return;
 
     ctx.beginPath();
-
-    ctx.moveTo(
-        points[0].x,
-        points[0].y
-    );
+    ctx.moveTo(points[0].x, points[0].y);
 
     for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(
-            points[i].x,
-            points[i].y
-        );
+        ctx.lineTo(points[i].x, points[i].y);
     }
 
-    ctx.strokeStyle = "white";
+    ctx.strokeStyle = "black";
     ctx.lineWidth = 4;
     ctx.stroke();
+
+    const end = points[points.length - 1];
+
+    ctx.beginPath();
+    ctx.arc(
+        end.x,
+        end.y,
+        8,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fillStyle = holdingEndpoint
+        ? "lime"
+        : "red";
+
+    ctx.fill();
 }
 
 
@@ -168,17 +200,14 @@ function animate() {
 
 animate();
 
-ropeButton.addEventListener(
-    "click",
-    () => {
-        placingRope = true;
+ropeButton.addEventListener("click", () => {
+    placingRope = true;
 
-        ropeButton.classList.add(
-            "active"
-        );
+    console.log("Rope button clicked");
+    console.log("placingRope:", placingRope);
 
-    }
-);
+    ropeButton.classList.add("active");
+});
 
 resetButton.addEventListener(
     "click",
@@ -195,3 +224,32 @@ resetButton.addEventListener(
 
     }
 );
+canvas.addEventListener("pointerdown", event => {
+    updatePointer(event);
+
+    if (placingRope) {
+        const totalLength = Number(ropeLengthInput.value);
+
+        createRope(
+            pointer.x,
+            pointer.y,
+            totalLength
+        );
+
+        ropeButton.classList.remove("active");
+        return;
+    }
+
+    if (points.length === 0) return;
+
+    const end = points[points.length - 1];
+
+    const dx = pointer.x - end.x;
+    const dy = pointer.y - end.y;
+
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance < 20) {
+        holdingEndpoint = true;
+    }
+});
