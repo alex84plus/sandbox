@@ -14,11 +14,13 @@ const damping = 0.99;
 const gravity = 0.5;
 const segLength = 15;
 
-let points = [];
+let ropes = [];
 
 let ropeActive = false;
 let placingRope = false;
 let holdingEndpoint = false;
+
+let heldRope = null;
 
 let pointer = {
     x: 0,
@@ -49,19 +51,18 @@ class Point{
     }
 }
 
-let actualSegLength = segLength;
-
-function createRope(startX, startY, totalLength){
-    points = [];
+function createRope(startX, startY, totalLength) {
+    const points = [];
 
     const segmentCount = Math.max(
         2,
         Math.ceil(totalLength / segLength)
     );
 
-    actualSegLength = totalLength / segmentCount;
+    const actualSegLength =
+        totalLength / segmentCount;
 
-    for(let i = 0; i <= segmentCount; i++){
+    for (let i = 0; i <= segmentCount; i++) {
         const x = startX;
         const y = startY + i * actualSegLength;
 
@@ -72,7 +73,14 @@ function createRope(startX, startY, totalLength){
         );
     }
 
-    ropeActive = true;
+    ropes.push({
+        points: points,
+        segmentLength: actualSegLength
+    });
+
+    console.log("ropes:", ropes.length);
+    console.log("all ropes:", ropes);
+
     placingRope = false;
 }
 
@@ -81,23 +89,18 @@ function createRope(startX, startY, totalLength){
 //
 
 function update() {
-    for (let i = 0; i < points.length; i++) {
-        const point = points[i];
-
-        const isEndpoint =
-            i === points.length - 1;
-
-        if (holdingEndpoint && isEndpoint) {
-            continue;
+    for (const rope of ropes) {
+        for (const point of rope.points) {
+            point.update();
         }
 
-        point.update();
+        solveConstraints(rope);
     }
-
-    solveConstraints();
 }
 
-function solveConstraints() {
+function solveConstraints(rope) {
+    const points = rope.points;
+
     for (let i = 0; i < points.length - 1; i++) {
         const a = points[i];
         const b = points[i + 1];
@@ -105,15 +108,19 @@ function solveConstraints() {
         const dx = b.x - a.x;
         const dy = b.y - a.y;
 
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        const distance =
+            Math.sqrt(dx * dx + dy * dy);
 
         if (distance === 0) continue;
 
         const difference =
-            (distance - actualSegLength) / distance;
+            (distance - rope.segmentLength) / distance;
 
-        const offsetX = dx * difference * 0.5;
-        const offsetY = dy * difference * 0.5;
+        const offsetX =
+            dx * difference * 0.5;
+
+        const offsetY =
+            dy * difference * 0.5;
 
         if (!a.pinned) {
             a.x += offsetX;
@@ -127,10 +134,6 @@ function solveConstraints() {
     }
 }
 
-canvas.addEventListener("pointerup", () => {
-    holdingEndpoint = false;
-});
-
 function updatePointer(event) {
     const rect = canvas.getBoundingClientRect();
 
@@ -141,8 +144,9 @@ function updatePointer(event) {
 canvas.addEventListener("pointermove", event => {
     updatePointer(event);
 
-    if (holdingEndpoint) {
-        const end = points[points.length - 1];
+    if (holdingEndpoint && heldRope) {
+        const end =
+            heldRope.points[heldRope.points.length - 1];
 
         end.x = pointer.x;
         end.y = pointer.y;
@@ -159,35 +163,46 @@ function draw() {
         canvas.height
     );
 
-    if (points.length === 0) return;
+    for (let r = 0; r < ropes.length; r++) {
+        const rope = ropes[r];
+        const points = rope.points;
 
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
+        if (points.length === 0) continue;
 
-    for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x, points[i].y);
+        ctx.beginPath();
+
+        ctx.moveTo(
+            points[0].x,
+            points[0].y
+        );
+
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(
+                points[i].x,
+                points[i].y
+            );
+        }
+
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        const end =
+            points[points.length - 1];
+
+        ctx.beginPath();
+
+        ctx.arc(
+            end.x,
+            end.y,
+            8,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle = "red";
+        ctx.fill();
     }
-
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 4;
-    ctx.stroke();
-
-    const end = points[points.length - 1];
-
-    ctx.beginPath();
-    ctx.arc(
-        end.x,
-        end.y,
-        8,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.fillStyle = holdingEndpoint
-        ? "lime"
-        : "red";
-
-    ctx.fill();
 }
 
 
@@ -209,24 +224,18 @@ ropeButton.addEventListener("click", () => {
     ropeButton.classList.add("active");
 });
 
-resetButton.addEventListener(
-    "click",
-    () => {
-        points = [];
+resetButton.addEventListener("click", () => {
+    ropes = [];
 
-        ropeActive = false;
-        placingRope = false;
-        holdingEndpoint = false;
+    placingRope = false;
+    holdingEndpoint = false;
 
-        ropeButton.classList.remove(
-            "active"
-        );
-
-    }
-);
+    ropeButton.classList.remove("active");
+});
 canvas.addEventListener("pointerdown", event => {
     updatePointer(event);
 
+    // Create a new rope
     if (placingRope) {
         const totalLength = Number(ropeLengthInput.value);
 
@@ -240,16 +249,32 @@ canvas.addEventListener("pointerdown", event => {
         return;
     }
 
-    if (points.length === 0) return;
+    // If already holding a rope, clicking drops it
+    if (holdingEndpoint) {
+        holdingEndpoint = false;
+        heldRope = null;
+        return;
+    }
 
-    const end = points[points.length - 1];
+    // Otherwise, check every rope endpoint
+    for (const rope of ropes) {
 
-    const dx = pointer.x - end.x;
-    const dy = pointer.y - end.y;
+        const end =
+            rope.points[rope.points.length - 1];
 
-    const distance = Math.sqrt(dx * dx + dy * dy);
+        const dx = pointer.x - end.x;
+        const dy = pointer.y - end.y;
 
-    if (distance < 20) {
-        holdingEndpoint = true;
+        const distance =
+            Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 20) {
+            holdingEndpoint = true;
+            heldRope = rope;
+
+            console.log("Picked up rope");
+
+            break;
+        }
     }
 });
