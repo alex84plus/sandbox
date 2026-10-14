@@ -41,9 +41,9 @@ class Ball {
 
     update(){
         // velocity using 2 points
-        if(balls[i].value = 1) this.vy += gravityHeavy;
-        if(balls[i].value = 2) this.vy += gravityMid;
-        if(balls[i].value = 3) this.vy += gravityLight;
+        if(this.value = 1) this.vy += gravityHeavy;
+        if(this.value = 2) this.vy += gravityMid;
+        if(this.value = 3) this.vy += gravityLight;
         this.vx += friction;
 
         this.x += vx;
@@ -98,7 +98,7 @@ resetButton.addEventListener("click", () => {
 });
 
 function createBall(startX, startY, radius, value){
-    const newBall = new Ball(pointer.x, pointer.y, ballRadiusInput, ballWeightInput);
+    const newBall = new Ball(startX, startY, radius, value);
     balls.push(newBall);
     placingBall = false;
 }
