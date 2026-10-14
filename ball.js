@@ -98,7 +98,7 @@ resetButton.addEventListener("click", () => {
 });
 
 function createBall(startX, startY, radius, value){
-    const newBall = new Ball(pointer.x, pointer.y, 3, 2);
+    const newBall = new Ball(pointer.x, pointer.y, ballRadiusInput, ballWeightInput);
     balls.push(newBall);
     placingBall = false;
 }
@@ -115,7 +115,7 @@ animate();
 canvas.addEventListener("pointerdown", event => {
     updatePointer(event);
 
-    // Create a new rope
+    // Create a new ball
     if (placingBall) {
         const newRadius = Number(ballRadiusInput.value);
         const newWeight = Number(ballWeightInput.value);
