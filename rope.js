@@ -19,6 +19,7 @@ let ropes = [];
 let ropeActive = false;
 let placingRope = false;
 let holdingEndpoint = false;
+let isDragging = false;
 
 let heldRope = null;
 
@@ -134,27 +135,6 @@ function solveConstraints(rope) {
     }
 }
 
-function updatePointer(event) {
-    const rect = canvas.getBoundingClientRect();
-
-    pointer.x = event.clientX - rect.left;
-    pointer.y = event.clientY - rect.top;
-}
-
-canvas.addEventListener("pointermove", event => {
-    updatePointer(event);
-
-    if (holdingEndpoint && heldRope) {
-        const end =
-            heldRope.points[heldRope.points.length - 1];
-
-        end.x = pointer.x;
-        end.y = pointer.y;
-
-        end.oldX = pointer.x;
-        end.oldY = pointer.y;
-    }
-});
 function draw() {
     ctx.clearRect(
         0,
@@ -232,6 +212,7 @@ resetButton.addEventListener("click", () => {
 
     ropeButton.classList.remove("active");
 });
+
 canvas.addEventListener("pointerdown", event => {
     updatePointer(event);
 
@@ -250,11 +231,6 @@ canvas.addEventListener("pointerdown", event => {
     }
 
     // If already holding a rope, clicking drops it
-    if (holdingEndpoint) {
-        holdingEndpoint = false;
-        heldRope = null;
-        return;
-    }
 
     // Otherwise, check every rope endpoint
     for (const rope of ropes) {
@@ -278,3 +254,29 @@ canvas.addEventListener("pointerdown", event => {
         }
     }
 });
+
+function updatePointer(event) {
+    const rect = canvas.getBoundingClientRect();
+
+    pointer.x = event.clientX - rect.left;
+    pointer.y = event.clientY - rect.top;
+}
+
+canvas.addEventListener("pointermove", event => {
+    if (!holdingEndpoint) return;
+    updatePointer(event);
+
+    const end =
+        heldRope.points[heldRope.points.length - 1];
+
+    end.x = pointer.x;
+    end.y = pointer.y;
+
+    end.oldX = pointer.x;
+    end.oldY = pointer.y;
+
+});
+
+canvas.addEventListener('pointerup', () => {
+    holdingEndpoint = false;
+})
